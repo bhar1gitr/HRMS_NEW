@@ -1,0 +1,1105 @@
+import React, { useState, useEffect } from "react";
+import { C, SHADOW, RADIUS } from "../../../theme";
+import { apiUrl } from "../../../URL";
+
+// ── Constants ────────────────────────────────────────────────────
+const EMPTY_FORM = {
+  FirstName: "",
+  MiddleName: "",
+  LastName: "",
+  Gender: "",
+  DateOfBirth: "",
+  MaritalStatus: "",
+  Nationality: "India",
+  EmailId: "",
+  AlternateEmailId: "",
+  CountryCode1: "+91",
+  MobileNo: "",
+  CountryCode2: "+91",
+  AlternateMobileNo: "",
+  CurrentAddress: "",
+  City: "",
+  State: "",
+  Country: "India",
+  AppliedDesignation: "",
+  AppliedDepartment: "",
+  CurrentCompany: "",
+  CurrentDesignation: "",
+  TotalExperience: "",
+  CurrentCTC: "",
+  ExpectedCTC: "",
+  NoticePeriod: "",
+  SourceOfHiring: "Direct",
+  CandidateStatus: "Applied",
+  ResumeFile: null,
+  Photo: null,
+};
+
+const PIPELINE_STATUSES = [
+  "Applied",
+  "Interview Scheduled",
+  "Interview In Progress",
+];
+
+const STATUS_STYLE = {
+  Applied: { bg: "#e8f4fa", color: "#0c447c" },
+  "Interview Scheduled": { bg: "#fff3e0", color: "#e65100" },
+  "Interview In Progress": { bg: "#e3f2fd", color: "#1565c0" },
+  Selected: { bg: "#e8f5e9", color: "#2e7d32" },
+  Rejected: { bg: "#ffebee", color: "#c62828" },
+  "On Hold": { bg: "#f5f5f5", color: "#616161" },
+};
+
+function FormSection({ title, children }) {
+  return (
+    <div style={{ marginBottom: "24px" }}>
+      <h3
+        style={{
+          fontSize: "15px",
+          fontWeight: "700",
+          marginBottom: "14px",
+          color: C.text,
+        }}
+      >
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+function Inp({ placeholder, value, onChange, type = "text" }) {
+  return (
+    <input
+      type={type}
+      placeholder={placeholder}
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      style={styles.inputElement}
+    />
+  );
+}
+
+function Sel({ value, onChange, options = [], placeholder = "Select" }) {
+  return (
+    <select
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      style={styles.inputElement}
+    >
+      <option value="">{placeholder}</option>
+
+      {options.map((opt) => (
+        <option key={opt} value={opt}>
+          {opt}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div
+      style={{
+        marginTop: "20px",
+        marginBottom: "10px",
+        fontSize: "13px",
+        fontWeight: "700",
+        color: C.primary,
+        textTransform: "uppercase",
+        letterSpacing: "0.5px",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function InfoRow({ label, value }) {
+  if (!value) return null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: "16px",
+        padding: "10px 0",
+        borderBottom: `1px solid ${C.border || "#e2e8f0"}`,
+      }}
+    >
+      <span
+        style={{
+          color: C.muted,
+          fontSize: "13px",
+          fontWeight: "500",
+        }}
+      >
+        {label}
+      </span>
+
+      <span
+        style={{
+          color: C.text,
+          fontSize: "13px",
+          fontWeight: "600",
+          textAlign: "right",
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function initials(candidate) {
+  if (!candidate) return "";
+
+  return `${candidate.FirstName?.[0] || ""}${
+    candidate.LastName?.[0] || ""
+  }`.toUpperCase();
+}
+
+// ── Main Component ────────────────────────────────────────────────
+export default function Candidates() {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  const [showDrawer, setShowDrawer] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [candidateForm, setCandidateForm] = useState(EMPTY_FORM);
+
+  useEffect(() => {
+    fetchCandidates();
+  }, []);
+
+  const fetchCandidates = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${apiUrl}/api/candidates/all`);
+      const data = await res.json();
+      setCandidates(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredCandidates = candidates.filter((c) => {
+    const nameMatch = `${c.FirstName || ""} ${c.LastName || ""}`
+      .toLowerCase()
+      .includes(search.toLowerCase());
+    const statusMatch =
+      statusFilter === "All" || c.CandidateStatus === statusFilter;
+    return nameMatch && statusMatch;
+  });
+
+  const pipelineCount = candidates.filter((c) =>
+    PIPELINE_STATUSES.includes(c.CandidateStatus),
+  ).length;
+  const selectedCount = candidates.filter(
+    (c) => c.CandidateStatus === "Selected",
+  ).length;
+  const rejectedCount = candidates.filter(
+    (c) => c.CandidateStatus === "Rejected",
+  ).length;
+
+  const setField = (key, val) =>
+    setCandidateForm((prev) => ({ ...prev, [key]: val }));
+
+  const handleView = (candidate) => {
+    setSelectedCandidate(candidate);
+    setShowDrawer(true);
+  };
+
+  const handleAddCandidate = async () => {
+    if (
+      !candidateForm.FirstName ||
+      !candidateForm.LastName ||
+      !candidateForm.EmailId ||
+      !candidateForm.MobileNo ||
+      !candidateForm.AppliedDesignation
+    ) {
+      alert("Please fill all required fields (*)");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const formData = new FormData();
+      Object.keys(candidateForm).forEach((key) => {
+        if (key !== "ResumeFile" && key !== "Photo")
+          formData.append(key, candidateForm[key]);
+      });
+
+      if (candidateForm.ResumeFile)
+        formData.append("ResumeFile", candidateForm.ResumeFile);
+      if (candidateForm.Photo) formData.append("Photo", candidateForm.Photo);
+
+      const response = await fetch(`${apiUrl}/api/candidates/create`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert("Candidate added successfully!");
+        setShowAddModal(false);
+        setCandidateForm(EMPTY_FORM);
+        fetchCandidates();
+      } else {
+        alert(data.message || "Failed to add candidate");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error connecting to server");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      {/* Header */}
+      <div style={styles.header}>
+        <div>
+          <h1 style={styles.title}>Candidates</h1>
+          <p style={styles.subtitle}>
+            Manage recruitment pipeline and interview progress
+          </p>
+        </div>
+        <button style={styles.addButton} onClick={() => setShowAddModal(true)}>
+          + Add Candidate
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div style={styles.statsGrid}>
+        <StatCard
+          title="Total Candidates"
+          value={candidates.length}
+          color={C.primary}
+        />
+        <StatCard title="In Pipeline" value={pipelineCount} color="#0f766e" />
+        <StatCard title="Selected" value={selectedCount} color="#15803d" />
+        <StatCard title="Rejected" value={rejectedCount} color={C.accent} />
+      </div>
+
+      {/* Toolbar */}
+      <div style={styles.toolbar}>
+        <div style={styles.searchWrap}>
+          <input
+            type="text"
+            placeholder="Search by name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={styles.searchInput}
+          />
+        </div>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={styles.filterSelect}
+        >
+          <option value="All">All Statuses</option>
+          {Object.keys(STATUS_STYLE).map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Table */}
+      <div style={styles.tableWrapper}>
+        {loading ? (
+          <div style={styles.loading}>Loading candidates...</div>
+        ) : (
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Candidate</th>
+                <th style={styles.th}>Designation</th>
+                <th style={styles.th}>Department</th>
+                <th style={styles.th}>Experience</th>
+                <th style={styles.th}>Status</th>
+                <th style={styles.th}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCandidates.length > 0 ? (
+                filteredCandidates.map((c) => (
+                  <tr key={c.CandidateID} style={styles.tr}>
+                    <td style={styles.td}>
+                      <div style={styles.candidateCell}>
+                        <div
+                          style={styles.miniAvatar}
+                        >{`${c.FirstName?.[0] || ""}${c.LastName?.[0] || ""}`}</div>
+                        <div>
+                          <div style={styles.name}>
+                            {c.FirstName} {c.LastName}
+                          </div>
+                          <div style={styles.email}>{c.EmailId}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={styles.td}>{c.AppliedDesignation || "—"}</td>
+                    <td style={styles.td}>{c.AppliedDepartment || "—"}</td>
+                    <td style={styles.td}>
+                      {c.TotalExperience ? `${c.TotalExperience} Yrs` : "—"}
+                    </td>
+                    <td style={styles.td}>
+                      <StatusPill status={c.CandidateStatus} />
+                    </td>
+                    <td style={styles.td}>
+                      <button
+                        style={styles.viewButton}
+                        onClick={() => handleView(c)}
+                      >
+                        View Profile
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" style={styles.empty}>
+                    No candidates found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Sliding Side Profile Drawer */}
+      {showDrawer && selectedCandidate && (
+        <>
+          <div
+            style={styles.overlay}
+            onClick={() => {
+              setShowDrawer(false);
+              setSelectedCandidate(null);
+            }}
+          />
+          <div style={styles.drawer}>
+            <div style={styles.drawerHead}>
+              <span style={styles.drawerTitle}>Candidate Profile</span>
+              <button
+                style={styles.iconBtn}
+                onClick={() => {
+                  setShowDrawer(false);
+                  setSelectedCandidate(null);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={styles.drawerBody}>
+              {/* Header Avatar Complex */}
+              <div style={styles.drawerHero}>
+                <div style={styles.av}>{initials(selectedCandidate)}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.heroName}>
+                    {selectedCandidate.FirstName}{" "}
+                    {selectedCandidate.MiddleName
+                      ? selectedCandidate.MiddleName + " "
+                      : ""}
+                    {selectedCandidate.LastName}
+                  </div>
+                  <div style={styles.heroSub}>
+                    {selectedCandidate.AppliedDesignation}
+                    {selectedCandidate.AppliedDepartment
+                      ? ` · ${selectedCandidate.AppliedDepartment}`
+                      : ""}
+                  </div>
+                  <div style={{ marginTop: "8px" }}>
+                    <StatusPill status={selectedCandidate.CandidateStatus} />
+                  </div>
+                </div>
+              </div>
+
+              <SectionLabel>Personal Details</SectionLabel>
+              <InfoRow label="Gender" value={selectedCandidate.Gender} />
+              <InfoRow
+                label="Date of Birth"
+                value={selectedCandidate.DateOfBirth}
+              />
+              <InfoRow
+                label="Marital Status"
+                value={selectedCandidate.MaritalStatus}
+              />
+              <InfoRow
+                label="Nationality"
+                value={selectedCandidate.Nationality}
+              />
+
+              <SectionLabel>Contact Links</SectionLabel>
+              <InfoRow
+                label="Email Address"
+                value={selectedCandidate.EmailId}
+              />
+              <InfoRow
+                label="Alternate Email"
+                value={selectedCandidate.AlternateEmailId}
+              />
+              <InfoRow
+                label="Mobile Number"
+                value={`${selectedCandidate.CountryCode1 || "+91"} ${selectedCandidate.MobileNo}`}
+              />
+              <InfoRow
+                label="Alternate Mobile"
+                value={
+                  selectedCandidate.AlternateMobileNo
+                    ? `${selectedCandidate.CountryCode2 || "+91"} ${selectedCandidate.AlternateMobileNo}`
+                    : null
+                }
+              />
+
+              <SectionLabel>Address Parameters</SectionLabel>
+              {selectedCandidate.CurrentAddress && (
+                <p style={styles.addressBlock}>
+                  {selectedCandidate.CurrentAddress}
+                </p>
+              )}
+              <InfoRow label="City" value={selectedCandidate.City} />
+              <InfoRow label="State" value={selectedCandidate.State} />
+              <InfoRow label="Country" value={selectedCandidate.Country} />
+
+              <SectionLabel>Professional Standpoint</SectionLabel>
+              <InfoRow
+                label="Current Company"
+                value={selectedCandidate.CurrentCompany}
+              />
+              <InfoRow
+                label="Current Designation"
+                value={selectedCandidate.CurrentDesignation}
+              />
+              <InfoRow
+                label="Total Experience"
+                value={
+                  selectedCandidate.TotalExperience
+                    ? `${selectedCandidate.TotalExperience} Years`
+                    : null
+                }
+              />
+              <InfoRow
+                label="Current CTC"
+                value={selectedCandidate.CurrentCTC}
+              />
+              <InfoRow
+                label="Expected CTC"
+                value={selectedCandidate.ExpectedCTC}
+              />
+              <InfoRow
+                label="Notice Period"
+                value={selectedCandidate.NoticePeriod}
+              />
+
+              <SectionLabel>Application Meta</SectionLabel>
+              <InfoRow
+                label="Hiring Source"
+                value={selectedCandidate.SourceOfHiring}
+              />
+              <InfoRow
+                label="Current Status"
+                value={selectedCandidate.CandidateStatus}
+              />
+            </div>
+
+            <div style={styles.drawerFoot}>
+              <button style={styles.drawerPrimary}>Schedule Interview</button>
+              <button
+                style={styles.drawerSecondary}
+                onClick={() => {
+                  setShowDrawer(false);
+                  setSelectedCandidate(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Creation Modal System */}
+      {showAddModal && (
+        <>
+          <div style={styles.overlay} onClick={() => setShowAddModal(false)} />
+          <div style={styles.modal}>
+            <div style={styles.modalHead}>
+              <div>
+                <h2 style={styles.modalTitle}>Add New Candidate</h2>
+                <p style={styles.modalSub}>
+                  Fields marked * are mandatory blueprints
+                </p>
+              </div>
+              <button
+                style={styles.iconBtn}
+                onClick={() => setShowAddModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={styles.modalBody}>
+              <FormSection title="Personal Information">
+                <div style={styles.grid2}>
+                  <Inp
+                    placeholder="First Name *"
+                    value={candidateForm.FirstName}
+                    onChange={(v) => setField("FirstName", v)}
+                  />
+                  <Inp
+                    placeholder="Middle Name"
+                    value={candidateForm.MiddleName}
+                    onChange={(v) => setField("MiddleName", v)}
+                  />
+                  <Inp
+                    placeholder="Last Name *"
+                    value={candidateForm.LastName}
+                    onChange={(v) => setField("LastName", v)}
+                  />
+                  <Sel
+                    value={candidateForm.Gender}
+                    onChange={(v) => setField("Gender", v)}
+                    options={["Male", "Female", "Other"]}
+                    placeholder="Gender"
+                  />
+                  <Inp
+                    type="date"
+                    value={candidateForm.DateOfBirth}
+                    onChange={(v) => setField("DateOfBirth", v)}
+                  />
+                  <Sel
+                    value={candidateForm.MaritalStatus}
+                    onChange={(v) => setField("MaritalStatus", v)}
+                    options={["Single", "Married", "Divorced"]}
+                    placeholder="Marital Status"
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection title="Contact Specifications">
+                <div style={styles.grid2}>
+                  <Inp
+                    placeholder="Email ID *"
+                    value={candidateForm.EmailId}
+                    onChange={(v) => setField("EmailId", v)}
+                  />
+                  <Inp
+                    placeholder="Alternate Email"
+                    value={candidateForm.AlternateEmailId}
+                    onChange={(v) => setField("AlternateEmailId", v)}
+                  />
+                  <Inp
+                    placeholder="Mobile Number *"
+                    value={candidateForm.MobileNo}
+                    onChange={(v) => setField("MobileNo", v)}
+                  />
+                  <Inp
+                    placeholder="Alternate Mobile"
+                    value={candidateForm.AlternateMobileNo}
+                    onChange={(v) => setField("AlternateMobileNo", v)}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection title="Current Residence">
+                <textarea
+                  placeholder="Current Address Details"
+                  value={candidateForm.CurrentAddress}
+                  onChange={(e) => setField("CurrentAddress", e.target.value)}
+                  style={styles.textAreaElement}
+                />
+                <div style={styles.grid2}>
+                  <Inp
+                    placeholder="City"
+                    value={candidateForm.City}
+                    onChange={(v) => setField("City", v)}
+                  />
+                  <Inp
+                    placeholder="State"
+                    value={candidateForm.State}
+                    onChange={(v) => setField("State", v)}
+                  />
+                  <Inp
+                    placeholder="Country"
+                    value={candidateForm.Country}
+                    onChange={(v) => setField("Country", v)}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection title="Professional Footprint">
+                <div style={styles.grid2}>
+                  <Inp
+                    placeholder="Applied Designation *"
+                    value={candidateForm.AppliedDesignation}
+                    onChange={(v) => setField("AppliedDesignation", v)}
+                  />
+                  <Inp
+                    placeholder="Applied Department"
+                    value={candidateForm.AppliedDepartment}
+                    onChange={(v) => setField("AppliedDepartment", v)}
+                  />
+                  <Inp
+                    placeholder="Current Company"
+                    value={candidateForm.CurrentCompany}
+                    onChange={(v) => setField("CurrentCompany", v)}
+                  />
+                  <Inp
+                    placeholder="Current Designation"
+                    value={candidateForm.CurrentDesignation}
+                    onChange={(v) => setField("CurrentDesignation", v)}
+                  />
+                  <Inp
+                    placeholder="Total Experience (Years)"
+                    value={candidateForm.TotalExperience}
+                    onChange={(v) => setField("TotalExperience", v)}
+                  />
+                  <Inp
+                    placeholder="Current CTC"
+                    value={candidateForm.CurrentCTC}
+                    onChange={(v) => setField("CurrentCTC", v)}
+                  />
+                  <Inp
+                    placeholder="Expected CTC"
+                    value={candidateForm.ExpectedCTC}
+                    onChange={(v) => setField("ExpectedCTC", v)}
+                  />
+                  <Inp
+                    placeholder="Notice Period"
+                    value={candidateForm.NoticePeriod}
+                    onChange={(v) => setField("NoticePeriod", v)}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection title="Application Context">
+                <div style={styles.grid2}>
+                  <Sel
+                    value={candidateForm.SourceOfHiring}
+                    onChange={(v) => setField("SourceOfHiring", v)}
+                    options={[
+                      "Direct",
+                      "LinkedIn",
+                      "Naukri",
+                      "Referral",
+                      "Indeed",
+                      "Consultancy",
+                    ]}
+                  />
+                  <Sel
+                    value={candidateForm.CandidateStatus}
+                    onChange={(v) => setField("CandidateStatus", v)}
+                    options={[
+                      "Applied",
+                      "Interview Scheduled",
+                      "Interview In Progress",
+                      "On Hold",
+                    ]}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection title="Attachments Block">
+                <div style={styles.grid2}>
+                  <div>
+                    <label style={styles.fileLabel}>Resume Asset (PDF)</label>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      style={styles.fileInput}
+                      onChange={(e) =>
+                        setField("ResumeFile", e.target.files[0])
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label style={styles.fileLabel}>Profile Picture</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={styles.fileInput}
+                      onChange={(e) => setField("Photo", e.target.files[0])}
+                    />
+                  </div>
+                </div>
+              </FormSection>
+            </div>
+
+            <div style={styles.modalFoot}>
+              <button
+                style={styles.cancelBtn}
+                onClick={() => setShowAddModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                style={{
+                  ...styles.saveBtn,
+                  opacity: saving ? 0.75 : 1,
+                  cursor: saving ? "not-allowed" : "pointer",
+                }}
+                onClick={handleAddCandidate}
+                disabled={saving}
+              >
+                {saving ? "Saving Blueprints…" : "Save Candidate"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* Reusable Components */
+function StatCard({ title, value, color }) {
+  return (
+    <div style={styles.statCard}>
+      <div
+        style={{
+          ...styles.statValue,
+          color,
+        }}
+      >
+        {value}
+      </div>
+      <div style={styles.statTitle}>{title}</div>
+    </div>
+  );
+}
+
+function StatusPill({ status }) {
+  const st = STATUS_STYLE[status] || { bg: "#f1f5f9", color: "#64748b" };
+  return (
+    <span
+      style={{
+        padding: "6px 14px",
+        borderRadius: "999px",
+        fontSize: "12.5px",
+        fontWeight: "600",
+        background: st.bg,
+        color: st.color,
+      }}
+    >
+      {status}
+    </span>
+  );
+}
+
+/* ==================== STYLES ==================== */
+const styles = {
+  container: { padding: "32px", background: C.bg, minHeight: "100vh" },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "32px",
+  },
+  title: { margin: 0, fontSize: "32px", fontWeight: "700", color: C.text },
+  subtitle: { color: C.muted, marginTop: "6px", fontSize: "15.5px" },
+  addButton: {
+    background: C.accent,
+    color: "#fff",
+    border: "none",
+    padding: "13px 24px",
+    borderRadius: RADIUS.button || "12px",
+    cursor: "pointer",
+    fontWeight: "600",
+    boxShadow: "0 8px 20px rgba(214,58,110,0.25)",
+  },
+
+  statsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "20px",
+    marginBottom: "32px",
+  },
+  statCard: {
+    background: C.card,
+    padding: "24px",
+    borderRadius: RADIUS.card,
+    boxShadow: SHADOW.card,
+  },
+  statValue: { fontSize: "32px", fontWeight: "700" },
+  statTitle: { color: C.muted, fontSize: "14.5px" },
+
+  toolbar: {
+    display: "flex",
+    gap: "12px",
+    marginBottom: "24px",
+    alignItems: "center",
+  },
+  searchWrap: { flex: 1, maxWidth: "420px" },
+  searchInput: {
+    width: "100%",
+    padding: "14px 18px",
+    borderRadius: RADIUS.input || "12px",
+    border: `1px solid ${C.border}`,
+    background: "#f8fafc",
+    fontSize: "15.5px",
+  },
+  filterSelect: {
+    padding: "12px 16px",
+    borderRadius: RADIUS.input || "10px",
+    border: `1px solid ${C.border}`,
+    background: C.card,
+  },
+
+  tableWrapper: {
+    background: C.card,
+    borderRadius: RADIUS.card,
+    overflow: "hidden",
+    boxShadow: SHADOW.card,
+  },
+  table: { width: "100%", borderCollapse: "collapse" },
+  th: {
+    background: "#f8fafc",
+    padding: "18px 16px",
+    textAlign: "left",
+    fontWeight: "600",
+    color: C.muted,
+    borderBottom: `2px solid ${C.border}`,
+  },
+  td: { padding: "18px 16px", borderBottom: `1px solid ${C.border}` },
+  tr: { transition: "background 0.2s" },
+  candidateCell: { display: "flex", alignItems: "center", gap: "12px" },
+  miniAvatar: {
+    width: "38px",
+    height: "38px",
+    borderRadius: "50%",
+    background: "#e8f4fa",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "700",
+    color: C.primary,
+  },
+  name: { fontWeight: "600", color: C.text },
+  email: { fontSize: "12.5px", color: C.muted },
+
+  viewButton: {
+    background: C.primary,
+    color: "#fff",
+    border: "none",
+    padding: "8px 18px",
+    borderRadius: RADIUS.button || "8px",
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+
+  loading: { padding: "80px", textAlign: "center", color: C.muted },
+  empty: { textAlign: "center", padding: "80px", color: C.muted },
+
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.5)",
+    zIndex: 1000,
+  },
+
+  drawer: {
+    position: "fixed",
+    top: 0,
+    right: 0,
+    width: "480px",
+    height: "100vh",
+    background: C.card,
+    zIndex: 1002,
+    boxShadow: "-12px 0 40px rgba(0,0,0,0.18)",
+    display: "flex",
+    flexDirection: "column",
+  },
+  drawerTitle: { fontSize: "16px", fontWeight: "700", color: C.text },
+  drawerBody: { flex: 1, padding: "24px", overflowY: "auto" },
+  drawerHero: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+    paddingBottom: "20px",
+    borderBottom: `1px solid ${C.borderLight || "#e2e8f0"}`,
+    marginBottom: "8px",
+  },
+  av: {
+    width: "52px",
+    height: "52px",
+    borderRadius: "50%",
+    background: C.inputBg || "#f1f5f9",
+    border: `2.5px solid ${C.primary}`,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "16px",
+    fontWeight: "700",
+    color: C.primary,
+    flexShrink: 0,
+  },
+  heroName: { fontSize: "16px", fontWeight: "700", color: C.text },
+  heroSub: { fontSize: "12.5px", color: C.muted, marginTop: "2px" },
+  addressBlock: {
+    fontSize: "13px",
+    color: C.text,
+    lineHeight: "1.6",
+    padding: "8px 0",
+    borderBottom: `1px solid ${C.borderLight || "#e2e8f0"}`,
+  },
+  drawerHead: {
+    padding: "18px 24px",
+    borderBottom: `1px solid ${C.border || "#e2e8f0"}`,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  drawerFoot: {
+    padding: "16px 24px",
+    borderTop: `1px solid ${C.borderLight || "#e2e8f0"}`,
+    display: "flex",
+    gap: "10px",
+  },
+  drawerPrimary: {
+    flex: 1,
+    padding: "10px",
+    background: C.accent,
+    color: "#fff",
+    border: "none",
+    borderRadius: RADIUS.button || "8px",
+    fontSize: "13.5px",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+  drawerSecondary: {
+    flex: 1,
+    padding: "10px",
+    background: C.inputBg || "#f1f5f9",
+    color: C.text,
+    border: `1px solid ${C.borderLight || "#e2e8f0"}`,
+    borderRadius: RADIUS.button || "8px",
+    fontSize: "13.5px",
+    cursor: "pointer",
+    fontWeight: "500",
+  },
+  iconBtn: {
+    background: "none",
+    border: "none",
+    fontSize: "18px",
+    cursor: "pointer",
+    color: C.muted,
+    padding: "4px",
+  },
+
+  modal: {
+    position: "fixed",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%,-50%)",
+    width: "90%",
+    maxWidth: "800px",
+    background: C.card,
+    borderRadius: RADIUS.card,
+    zIndex: 1001,
+    maxHeight: "85vh",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+  },
+  modalTitle: { fontSize: "20px", fontWeight: "700", color: C.text, margin: 0 },
+  modalSub: { fontSize: "13px", color: C.muted, marginTop: "4px" },
+  modalHead: {
+    padding: "20px 28px",
+    borderBottom: `1px solid ${C.borderLight || "#e2e8f0"}`,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    flexShrink: 0,
+  },
+  modalBody: { padding: "24px 28px", overflowY: "auto", flex: 1 },
+  modalFoot: {
+    padding: "16px 28px",
+    borderTop: `1px solid ${C.borderLight || "#e2e8f0"}`,
+    display: "flex",
+    gap: "12px",
+    justifyContent: "flex-end",
+    flexShrink: 0,
+  },
+
+  grid2: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: "14px",
+  },
+  inputElement: {
+    width: "100%",
+    padding: "11px 14px",
+    border: `1px solid ${C.border || "#e2e8f0"}`,
+    borderRadius: RADIUS.input || "10px",
+    fontSize: "14px",
+    background: C.inputBg || "#f8fafc",
+    color: C.text,
+    outline: "none",
+    transition: "border-color 0.2s",
+  },
+  textAreaElement: {
+    width: "100%",
+    padding: "11px 14px",
+    border: `1px solid ${C.border || "#e2e8f0"}`,
+    borderRadius: RADIUS.input || "10px",
+    fontSize: "14px",
+    background: C.inputBg || "#f8fafc",
+    color: C.text,
+    outline: "none",
+    minHeight: "80px",
+    resize: "vertical",
+    marginBottom: "14px",
+  },
+  fileLabel: {
+    display: "block",
+    fontSize: "12.5px",
+    fontWeight: "600",
+    color: C.muted,
+    marginBottom: "6px",
+  },
+  fileInput: {
+    width: "100%",
+    padding: "10px",
+    border: `2px dashed ${C.border || "#e2e8f0"}`,
+    borderRadius: RADIUS.input || "10px",
+    background: C.inputBg || "#f8fafc",
+    fontSize: "13px",
+    cursor: "pointer",
+  },
+  saveBtn: {
+    padding: "11px 28px",
+    background: C.accent,
+    color: "#fff",
+    border: "none",
+    borderRadius: RADIUS.button || "10px",
+    fontSize: "14px",
+    fontWeight: "600",
+    boxShadow: "0 4px 12px rgba(214,58,110,0.15)",
+  },
+  cancelBtn: {
+    padding: "11px 20px",
+    background: C.inputBg || "#f1f5f9",
+    color: C.text,
+    border: `1px solid ${C.borderLight || "#e2e8f0"}`,
+    borderRadius: RADIUS.button || "10px",
+    fontSize: "14px",
+    cursor: "pointer",
+  },
+};

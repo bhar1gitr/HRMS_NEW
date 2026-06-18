@@ -1,0 +1,56 @@
+const express = require("express");
+const router = express.Router();
+const multer = require("multer");
+const path = require("path");
+
+const candidateController = require("../controllers/candidateController");
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    if (file.fieldname === "ResumeFile") {
+      cb(null, "uploads/resumes");
+    } else {
+      cb(null, "uploads/photos");
+    }
+  },
+  filename: (req, file, cb) => {
+    cb(
+      null,
+      Date.now() +
+        "-" +
+        Math.round(Math.random() * 1e9) +
+        path.extname(file.originalname)
+    );
+  },
+});
+
+const upload = multer({ storage });
+
+router.post(
+  "/create",
+  upload.fields([
+    { name: "ResumeFile", maxCount: 1 },
+    { name: "Photo", maxCount: 1 },
+  ]),
+  candidateController.createCandidate
+);
+
+router.get("/all", candidateController.getCandidates);
+
+
+
+router.get("/pipeline", candidateController.getPipelineCandidates);
+
+router.post("/interviews/schedule", candidateController.scheduleInterview);
+
+
+router.post("/interviews/update-outcome", candidateController.updateRoundOutcome);
+
+router.get("/selected-list", candidateController.getSelectedCandidates);
+router.post("/convert-employee", candidateController.convertToEmployee);
+
+
+router.get("/:id", candidateController.getCandidateById);
+
+
+module.exports = router;
