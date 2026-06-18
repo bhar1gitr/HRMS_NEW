@@ -29,6 +29,24 @@ const navItems = [
     ],
   },
   { label: "Employees", path: "/admin/employees", icon: <FiUsers /> },
+  {
+  label: "Recruitment",
+  icon: <FiUsers />,
+  children: [
+    {
+      label: "Candidates",
+      path: "/admin/Recruitment/candidates",
+    },
+    {
+      label: "Interview Pipeline",
+      path: "/admin/Recruitment/interviews",
+    },
+    {
+      label: "Selected",
+      path: "/admin/Recruitment/selected",
+    },
+  ],
+},
 ];
 
 export default function Sidebar() {

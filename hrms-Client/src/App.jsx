@@ -13,6 +13,9 @@ import AdminEmployeeStatus from './pages/admin/EmployeeStatus'
 import AdminAnnouncement from './pages/admin/Announcement'
 import AdminClient from './pages/admin/Client'
 import AdminProjects from './pages/admin/Projects'
+import Candidates from "./pages/admin/Recruitment/Candidates";
+import InterviewPipeline from "./pages/admin/Recruitment/InterviewPipeline";
+import SelectedCandidates from "./pages/admin/Recruitment/SelectedCandidates";
 
 // employee
 import EmployeeDashboard from "./pages/employee/Dashboard";
@@ -46,6 +49,18 @@ function App() {
           <Route path="announcements" element={<AdminAnnouncement />} />
           <Route path="clients" element={<AdminClient />} />
           <Route path="projects" element={<AdminProjects />} />
+          <Route
+            path="/admin/Recruitment/candidates"
+            element={<Candidates />}
+          />
+          <Route
+            path="/admin/Recruitment/interviews"
+            element={<InterviewPipeline />}
+          />
+          <Route
+            path="/admin/Recruitment/selected"
+            element={<SelectedCandidates />}
+          />
         </Route>
 
         <Route 

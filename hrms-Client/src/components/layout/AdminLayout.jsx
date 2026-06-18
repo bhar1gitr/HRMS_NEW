@@ -21,11 +21,18 @@ export default function AdminLayout() {
 
 const styles = {
   layout: { display: "flex", minHeight: "100vh", background: C.bg },
-  main: { flex: 1, display: "flex", flexDirection: "column", marginLeft: "250px" },
+  main: {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  marginLeft: "250px",
+  minWidth: 0,
+},
   content: {
-    flex: 1,
-    padding: SPACING.pagePadding,
-    minHeight: "calc(100vh - 64px)",
-    overflow: "auto",
-  },
+  flex: 1,
+  padding: SPACING.pagePadding,
+  minHeight: "calc(100vh - 64px)",
+  overflowY: "auto",
+  overflowX: "hidden",
+},
 };
