@@ -21,7 +21,9 @@ import SelectedCandidates from "./pages/admin/Recruitment/SelectedCandidates";
 import EmployeeDashboard from "./pages/employee/Dashboard";
 import EmployeeDetails from "./pages/employee/Details";
 import EmployeeLeaves from "./pages/employee/Leave";
-import EmployeeResign from './pages/employee/Resign'
+import EmployeeResign from './pages/employee/Resign';
+import TimeSheetMaster from "./pages/employee/TimeSheet";
+
 
 // layouts
 import AdminLayout from "./components/layout/AdminLayout";
@@ -75,6 +77,7 @@ function App() {
           <Route path="details" element={<EmployeeDetails />} />
           <Route path="leaves" element={<EmployeeLeaves />} />
           <Route path="resignation" element={<EmployeeResign />} />
+          <Route path="timesheet" element={<TimeSheetMaster/>}/> 
         </Route>
       </Routes>
     </BrowserRouter>
