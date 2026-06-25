@@ -47,10 +47,13 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
 
+      // Locate this block in your Login login handler inside Login.jsx:
       if (data.user.role === "admin" || data.user.role === "hr") {
         navigate("/admin/dashboard");
+      } else if (data.user.role === "manager") {
+        // FIXED: Redirects directly to the explicit manager workspace path prefix
+        navigate("/manager/timesheet");
       } else {
-        // Otherwise, send everyone else to the employee module
         navigate("/employee/dashboard");
       }
     } catch (err) {

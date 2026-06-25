@@ -8,11 +8,11 @@ import Login from "./pages/Login";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminEmployees from "./pages/admin/Employees";
 import AdminDepartments from "./pages/admin/Departments";
-import AdminLeaves from './pages/admin/Leaves'
-import AdminEmployeeStatus from './pages/admin/EmployeeStatus'
-import AdminAnnouncement from './pages/admin/Announcement'
-import AdminClient from './pages/admin/Client'
-import AdminProjects from './pages/admin/Projects'
+import AdminLeaves from './pages/admin/Leaves';
+import AdminEmployeeStatus from './pages/admin/EmployeeStatus';
+import AdminAnnouncement from './pages/admin/Announcement';
+import AdminClient from './pages/admin/Client';
+import AdminProjects from './pages/admin/Projects';
 import Candidates from "./pages/admin/Recruitment/Candidates";
 import InterviewPipeline from "./pages/admin/Recruitment/InterviewPipeline";
 import SelectedCandidates from "./pages/admin/Recruitment/SelectedCandidates";
@@ -24,10 +24,13 @@ import EmployeeLeaves from "./pages/employee/Leave";
 import EmployeeResign from './pages/employee/Resign';
 import TimeSheetMaster from "./pages/employee/TimeSheet";
 
+// manager
+import ManagerTimesheetReview from "./pages/manager/TimeSheets";
 
 // layouts
 import AdminLayout from "./components/layout/AdminLayout";
 import EmployeeLayout from "./components/layout/EmployeeLayout";
+import ManagerLayout from "./components/layout/ManagerLayout";
 
 function App() {
   return (
@@ -35,6 +38,9 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
 
+        {/* ==========================================================================
+           1. ADMIN & HR ROUTING MODULE
+           ========================================================================== */}
         <Route 
           path="/admin" 
           element={
@@ -51,20 +57,14 @@ function App() {
           <Route path="announcements" element={<AdminAnnouncement />} />
           <Route path="clients" element={<AdminClient />} />
           <Route path="projects" element={<AdminProjects />} />
-          <Route
-            path="/admin/Recruitment/candidates"
-            element={<Candidates />}
-          />
-          <Route
-            path="/admin/Recruitment/interviews"
-            element={<InterviewPipeline />}
-          />
-          <Route
-            path="/admin/Recruitment/selected"
-            element={<SelectedCandidates />}
-          />
+          <Route path="/admin/Recruitment/candidates" element={<Candidates />} />
+          <Route path="/admin/Recruitment/interviews" element={<InterviewPipeline />} />
+          <Route path="/admin/Recruitment/selected" element={<SelectedCandidates />} />
         </Route>
 
+        {/* ==========================================================================
+           2. STANDARD EMPLOYEE ROUTING MODULE
+           ========================================================================== */}
         <Route 
           path="/employee" 
           element={
@@ -79,6 +79,22 @@ function App() {
           <Route path="resignation" element={<EmployeeResign />} />
           <Route path="timesheet" element={<TimeSheetMaster/>}/> 
         </Route>
+
+        {/* ==========================================================================
+           3. FIXED: SEPARATE MANAGER ROUTING MODULE (/manager/...)
+           ========================================================================== */}
+        <Route 
+          path="/manager" 
+          element = {
+            <ProtectedRoute allowedRoles={["manager"]}>
+              <ManagerLayout /> {/* FIXED: Uses separate manager shell with unique sidebar context */}
+            </ProtectedRoute>
+          }
+        >
+          {/* URL resolves perfectly to: /manager/timesheet */}
+          <Route path="timesheet" element={<ManagerTimesheetReview />} />
+        </Route>
+
       </Routes>
     </BrowserRouter>
   );
