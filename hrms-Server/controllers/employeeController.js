@@ -25,16 +25,21 @@ exports.getTimesheets = async (req, res) => {
     }
 };
 
-// 2. ADD NEW STEP LOG TASK
+// 2. ADD NEW STEP LOG TASK (FIXED)
 exports.addTimesheet = async (req, res) => {
     try {
         const tsData = { ...req.body };
         
         tsData.status = 0; // Default: Pending Review
 
-        // FIXED: Inject fallback placeholders for approval parameters to satisfy NOT NULL table rules
+        // Inject fallback placeholders for approval parameters to satisfy NOT NULL table rules
         tsData.approvedById = 0;
         tsData.approveDate = '1970-01-01 00:00:00'; 
+
+        // FIXED: Explicitly delete UI state keys so they don't break dynamic INSERT queries
+        delete tsData.timesheetid;
+        delete tsData.billingType;
+        delete tsData.studyid; 
 
         // Sanitize IDs
         tsData.projectid = cleanBigInt(tsData.projectid);
@@ -51,8 +56,6 @@ exports.addTimesheet = async (req, res) => {
         tsData.totmin = tsData.totmin ? String(tsData.totmin) : "0";
         tsData.unitcnt = tsData.unitcnt ? String(tsData.unitcnt) : "0";
 
-        delete tsData.timesheetid;
-
         const columns = Object.keys(tsData);
         const values = Object.values(tsData);
         const placeholders = columns.map(() => '?').join(', ');
@@ -67,7 +70,8 @@ exports.addTimesheet = async (req, res) => {
     }
 };
 
-// 3. EDIT PENDING LOG TASK
+// 3. EDIT PENDING LOG TASK (FIXED)
+// 3. EDIT PENDING LOG TASK (FIXED)
 exports.updateTimesheet = async (req, res) => {
     try {
         const { id } = req.params;
@@ -75,16 +79,27 @@ exports.updateTimesheet = async (req, res) => {
 
         const [existing] = await db.query('SELECT status FROM pms_timesheet WHERE timesheetid = ?', [id]);
         if (existing.length === 0) return res.status(404).json({ message: "Timesheet log not found" });
-        if (existing[0].status !== 0) {
+        
+        if (existing[0].status === 1) {
             return res.status(403).json({ message: "This entry is already locked and cannot be altered." });
         }
 
+        // 1. Strip UI-specific state fields
         delete tsData.timesheetid;
         delete tsData.createDate;
         delete tsData.updateDate;
-        delete tsData.status;
         delete tsData.FirstName;
         delete tsData.LastName;
+        delete tsData.billingType; 
+        delete tsData.studyid; 
+
+        // 2. FIXED: Strip Manager metadata (Fixes the DATETIME crash)
+        delete tsData.approveDate;
+        delete tsData.approvedById;
+        delete tsData.rejection_comment;
+
+        // Reset status to 0 (Pending) so the manager can review the corrections
+        tsData.status = 0; 
 
         tsData.projectid = cleanBigInt(tsData.projectid);
         tsData.taskid = cleanBigInt(tsData.taskid);
@@ -114,14 +129,14 @@ exports.updateTimesheet = async (req, res) => {
     }
 };
 
-// 4. FIXED: ADDED THE MISSING DELETE CONTROLLER FOR EMPLOYEES
+// 4. DELETE CONTROLLER
 exports.deleteTimesheet = async (req, res) => {
     try {
         const { id } = req.params;
 
         const [existing] = await db.query('SELECT status FROM pms_timesheet WHERE timesheetid = ?', [id]);
         if (existing.length === 0) return res.status(404).json({ message: "Timesheet log not found" });
-        if (existing[0].status !== 0) {
+        if (existing[0].status === 1) {
             return res.status(403).json({ message: "Cannot delete an approved or locked timesheet record." });
         }
 
@@ -133,65 +148,26 @@ exports.deleteTimesheet = async (req, res) => {
     }
 };
 
+// 5. RESIGNATION WORKFLOWS
 exports.submitResignation = async (req, res) => {
   try {
     const employeeId = req.user.id;
-
-    const {
-      resignationDate,
-      primaryReason,
-      additionalComments
-    } = req.body;
-
+    const { resignationDate, primaryReason, additionalComments } = req.body;
     const noticePeriodDays = 90;
 
     const lwd = new Date(resignationDate);
     lwd.setDate(lwd.getDate() + noticePeriodDays);
 
-    const attachmentPath = req.file
-      ? `/uploads/resignations/${req.file.filename}`
-      : null;
+    const attachmentPath = req.file ? `/uploads/resignations/${req.file.filename}` : null;
 
     const [result] = await db.query(
-      `
-      INSERT INTO employee_resignation
-      (
-        EmployeeID,
-        ResignationDate,
-        PrimaryReason,
-        AdditionalComments,
-        NoticePeriodDays,
-        SystemLastWorkingDate,
-        AttachmentPath,
-        Status
-      )
-      VALUES
-      (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        employeeId,
-        resignationDate,
-        primaryReason,
-        additionalComments || null,
-        noticePeriodDays,
-        lwd,
-        attachmentPath,
-        "Submitted"
-      ]
+      `INSERT INTO employee_resignation (EmployeeID, ResignationDate, PrimaryReason, AdditionalComments, NoticePeriodDays, SystemLastWorkingDate, AttachmentPath, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [employeeId, resignationDate, primaryReason, additionalComments || null, noticePeriodDays, lwd, attachmentPath, "Submitted"]
     );
 
-    res.status(201).json({
-      success: true,
-      message: "Resignation submitted successfully",
-      resignationId: result.insertId
-    });
-
+    res.status(201).json({ success: true, message: "Resignation submitted successfully", resignationId: result.insertId });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to submit resignation"
-    });
+    res.status(500).json({ success: false, message: "Failed to submit resignation" });
   }
 };
-
