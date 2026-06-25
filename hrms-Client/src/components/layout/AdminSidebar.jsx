@@ -21,7 +21,7 @@ const navItems = [
     hideForRoles: ["HR"], // Add a flag specifying which roles cannot see this item
     children: [
       { label: "Departments", path: "/admin/departments", icon: <FiBriefcase /> },
-      { label: "Leaves", path: "/admin/leaves", icon: <FiCalendar /> },
+      { label: "Leaves", path: "/admin/adminleaves", icon: <FiCalendar /> },
       { label: "Employee Status", path: "/admin/employeestatus", icon: <FiCalendar /> },
       { label: "Notice", path: "/admin/announcements", icon: <FiCalendar /> },
       { label: "Clients", path: "/admin/clients", icon: <FiCalendar /> },
@@ -47,6 +47,11 @@ const navItems = [
     },
   ],
 },
+{
+    label: "Leave Management",
+    path: "/admin/leaves",
+    icon: <FiCalendar />,
+  },
 ];
 
 export default function Sidebar() {

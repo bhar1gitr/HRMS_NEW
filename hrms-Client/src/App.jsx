@@ -20,7 +20,7 @@ import SelectedCandidates from "./pages/admin/Recruitment/SelectedCandidates";
 // employee
 import EmployeeDashboard from "./pages/employee/Dashboard";
 import EmployeeDetails from "./pages/employee/Details";
-import EmployeeLeaves from "./pages/employee/Leave";
+import EmployeeLeaves from "./pages/common/Leave";
 import EmployeeResign from './pages/employee/Resign';
 import TimeSheetMaster from "./pages/employee/TimeSheet";
 
@@ -52,7 +52,8 @@ function App() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="employees" element={<AdminEmployees />} />
           <Route path="departments" element={<AdminDepartments />} />
-          <Route path="leaves" element={<AdminLeaves />} />
+          <Route path="adminleaves" element={<AdminLeaves />} />
+          <Route path="leaves" element={<EmployeeLeaves />} />
           <Route path="employeestatus" element={<AdminEmployeeStatus />} />
           <Route path="announcements" element={<AdminAnnouncement />} />
           <Route path="clients" element={<AdminClient />} />

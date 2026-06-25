@@ -71,7 +71,6 @@ exports.addTimesheet = async (req, res) => {
 };
 
 // 3. EDIT PENDING LOG TASK (FIXED)
-// 3. EDIT PENDING LOG TASK (FIXED)
 exports.updateTimesheet = async (req, res) => {
     try {
         const { id } = req.params;

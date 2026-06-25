@@ -26,6 +26,8 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+
+
 router.post(
   "/create",
   upload.fields([
@@ -38,19 +40,60 @@ router.post(
 router.get("/all", candidateController.getCandidates);
 
 
+router.get(
+  "/pipeline",
+  candidateController.getPipelineCandidates
+);
 
-router.get("/pipeline", candidateController.getPipelineCandidates);
+router.post(
+  "/interviews/schedule",
+  candidateController.scheduleInterview
+);
 
-router.post("/interviews/schedule", candidateController.scheduleInterview);
+router.post(
+  "/interviews/update-outcome",
+  candidateController.updateRoundOutcome
+);
 
 
-router.post("/interviews/update-outcome", candidateController.updateRoundOutcome);
+router.get(
+  "/selected-list",
+  candidateController.getSelectedCandidates
+);
 
-router.get("/selected-list", candidateController.getSelectedCandidates);
-router.post("/convert-employee", candidateController.convertToEmployee);
+router.post(
+  "/update-status",
+  candidateController.updateCandidateStatus
+);
 
+
+router.post(
+  "/convert-employee",
+  candidateController.convertToEmployee
+);
+
+router.get(
+  "/employee-created-list",
+  candidateController.getEmployeeCreatedCandidates
+);
+
+router.post(
+  "/mark-joined",
+  candidateController.markEmployeeJoined
+);
+
+router.post(
+  "/appointment-letter-accepted",
+  candidateController.acceptAppointmentLetter
+);
+
+router.post(
+  "/send-appointment-letter",
+  candidateController.sendAppointmentLetter
+);
+
+router.post('/api/candidates/send-appointment-letter', candidateController.sendAppointmentLetter);
 
 router.get("/:id", candidateController.getCandidateById);
-
 
 module.exports = router;

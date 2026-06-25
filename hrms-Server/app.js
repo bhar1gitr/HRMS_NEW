@@ -8,6 +8,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const candidateRoutes = require("./routes/candidateRoutes");
 const managerRoutes = require('./routes/managerRoutes');
+const leaveRoutes = require("./routes/leaveRoutes");
 
 const PORT = process.env.PORT || 5000;
 
@@ -26,6 +27,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/employee', employeeRoutes)
 app.use("/api/candidates", candidateRoutes);
 app.use('/api/manager', managerRoutes);
+app.use("/api/leaves", leaveRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
