@@ -13,6 +13,18 @@ router.post(
   employeeController.submitResignation
 );
 
+router.get("/active-resignation", employeeController.getActiveResignation);
+
+router.get(
+  "/all-resignations",
+  employeeController.getAllResignations
+);
+
+// Advance workflow milestones (Updates status keys, adds comments, logs final LWD)
+router.put(
+  "/update-resignation-status",
+  employeeController.updateResignationStatus
+);
 
 router.get('/timesheets', employeeController.getTimesheets);
 router.post('/timesheets', employeeController.addTimesheet);

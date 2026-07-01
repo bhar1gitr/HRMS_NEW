@@ -151,7 +151,29 @@ exports.deleteTimesheet = async (req, res) => {
 // 5. RESIGNATION WORKFLOWS
 exports.submitResignation = async (req, res) => {
   try {
-    const employeeId = req.user.id;
+    console.log("Inspecting incoming request data context:");
+    console.log("req.user:", req.user);
+    console.log("req.body:", req.body);
+
+    // FIXED: Safe extraction matrix to fall back to the frontend's injected employeeId field
+    let employeeId = null;
+    
+    if (req.user && req.user.id) {
+      employeeId = req.user.id;
+    } else if (req.user && req.user.EmployeeID) {
+      employeeId = req.user.EmployeeID;
+    } else if (req.body && (req.body.employeeId || req.body.EmployeeID)) {
+      employeeId = req.body.employeeId || req.body.EmployeeID;
+    }
+
+    // Guard clause: If both req.user and req.body fall through, return a clean error instead of crashing node
+    if (!employeeId) {
+      return res.status(401).json({ 
+        success: false, 
+        message: "Authorization state context mismatch. Missing employee session identifier." 
+      });
+    }
+
     const { resignationDate, primaryReason, additionalComments } = req.body;
     const noticePeriodDays = 90;
 
@@ -161,13 +183,125 @@ exports.submitResignation = async (req, res) => {
     const attachmentPath = req.file ? `/uploads/resignations/${req.file.filename}` : null;
 
     const [result] = await db.query(
-      `INSERT INTO employee_resignation (EmployeeID, ResignationDate, PrimaryReason, AdditionalComments, NoticePeriodDays, SystemLastWorkingDate, AttachmentPath, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO employee_resignations (EmployeeID, ResignationDate, PrimaryReason, AdditionalComments, NoticePeriodDays, SystemLastWorkingDate, AttachmentPath, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [employeeId, resignationDate, primaryReason, additionalComments || null, noticePeriodDays, lwd, attachmentPath, "Submitted"]
     );
 
     res.status(201).json({ success: true, message: "Resignation submitted successfully", resignationId: result.insertId });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Failed to submit resignation" });
+    console.error("Error writing resignation node block:", error);
+    res.status(500).json({ success: false, message: "Failed to submit resignation", error: error.message });
+  }
+};
+
+exports.getActiveResignation = async (req, res) => {
+  try {
+    console.log("Checking getActiveResignation query context params:", req.query);
+
+    let employeeId = null;
+    
+    if (req.user && req.user.id) {
+      employeeId = req.user.id;
+    } else if (req.user && req.user.EmployeeID) {
+      employeeId = req.user.EmployeeID;
+    } else if (req.query && (req.query.employeeId || req.query.EmployeeID)) {
+      employeeId = req.query.employeeId || req.query.EmployeeID;
+    }
+
+    if (!employeeId) {
+      return res.status(200).json({ 
+        success: false, 
+        hasActiveResignation: false, 
+        message: "Awaiting valid structural user session token or query identifier parameters." 
+      });
+    }
+
+    // FIXED: Changed ORDER BY id DESC to ORDER BY ResignationDate DESC
+    const query = `
+      SELECT * FROM employee_resignations
+      WHERE EmployeeID = ? 
+      ORDER BY ResignationDate DESC LIMIT 1
+    `;
+    const [rows] = await db.query(query, [employeeId]);
+
+    if (rows.length === 0) {
+      return res.status(200).json({ success: true, hasActiveResignation: false });
+    }
+
+    res.status(200).json({ success: true, hasActiveResignation: true, data: rows[0] });
+  } catch (error) {
+    console.error("Error retrieving separation context state:", error);
+    res.status(500).json({ success: false, message: "Failed to read resignation logs", error: error.message });
+  }
+};
+
+// FETCH ALL RESIGNATIONS (For HR Oversight or Manager Hierarchy)
+exports.getAllResignations = async (req, res) => {
+  try {
+    const { role, supervisorId } = req.query;
+    let query = "";
+    let queryParams = [];
+
+    // HR and Admin see everything company-wide
+    if (role === 'hr' || role === 'admin') {
+      query = `
+        SELECT r.*, e.FirstName, e.LastName, d.Department as DepartmentName 
+        FROM employee_resignations r
+        JOIN employee e ON r.EmployeeID = e.EmployeeID
+        LEFT JOIN department d ON e.department = d.id
+        ORDER BY r.ResignationDate DESC
+      `;
+    } else {
+      // Managers see only their direct/indirect reports
+      query = `
+        SELECT r.*, e.FirstName, e.LastName, d.Department as DepartmentName 
+        FROM employee_resignations r
+        JOIN employee e ON r.EmployeeID = e.EmployeeID
+        LEFT JOIN department d ON e.department = d.id
+        WHERE e.DirectSupervisor = ? OR e.IndirectSupervisor = ?
+        ORDER BY r.ResignationDate DESC
+      `;
+      queryParams = [supervisorId, supervisorId];
+    }
+
+    const [rows] = await db.query(query, queryParams);
+    res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error("Error pulling exit records:", error);
+    res.status(500).json({ success: false, message: "Failed to load resignation requests" });
+  }
+};
+
+// UPDATE RESIGNATION STATE STATUS MATRIX
+exports.updateResignationStatus = async (req, res) => {
+  try {
+    const { resignationId, nextStatus, managerComments, confirmedLWD } = req.body;
+
+    if (!resignationId || !nextStatus) {
+      return res.status(400).json({ success: false, message: "Missing processing updates parameters." });
+    }
+
+    // Dynamic field building depending on which portal submits
+    let updateFields = "`Status` = ?";
+    let queryParams = [nextStatus];
+
+    if (managerComments) {
+      updateFields += ", `AdditionalComments` = CONCAT(IFNULL(AdditionalComments,''), '\nFeedback: ', ?)";
+      queryParams.push(managerComments);
+    }
+
+    if (confirmedLWD) {
+      updateFields += ", `SystemLastWorkingDate` = ?";
+      queryParams.push(new Date(confirmedLWD));
+    }
+
+    queryParams.push(resignationId);
+
+    await db.query(`UPDATE employee_resignations SET ${updateFields} WHERE id = ?`, queryParams);
+
+    res.status(200).json({ success: true, message: `Resignation state advanced to ${nextStatus}` });
+  } catch (error) {
+    console.error("Error transitioning separation status node:", error);
+    res.status(500).json({ success: false, message: "Failed to process resignation step update." });
   }
 };

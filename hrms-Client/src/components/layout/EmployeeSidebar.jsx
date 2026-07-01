@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FiGrid, FiUser, FiCalendar, FiLogOut, FiClipboard } from "react-icons/fi";
+import { FiGrid, FiUser, FiCalendar, FiLogOut, FiClipboard, FiStar } from "react-icons/fi";
 
 import logo from "/src/assets/WhiteLogo.png";
 import { SHADOW } from "../../theme";
@@ -29,6 +29,11 @@ const navItems = [
     label: "TimeSheet",
     path: "/employee/timesheet",
     icon: <FiClipboard />,
+  },
+  {
+    label: "Announcements",
+    path: "/employee/announcements",
+    icon: <FiStar />,
   },
 ];
 

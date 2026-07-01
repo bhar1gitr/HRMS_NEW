@@ -11,6 +11,7 @@ import {
   FiLayers,
   FiChevronDown,
   FiChevronRight,
+  FiStar
 } from "react-icons/fi";
 
 const navItems = [
@@ -21,7 +22,7 @@ const navItems = [
     hideForRoles: ["HR"], // Add a flag specifying which roles cannot see this item
     children: [
       { label: "Departments", path: "/admin/departments", icon: <FiBriefcase /> },
-      { label: "Leaves", path: "/admin/leaves", icon: <FiCalendar /> },
+      { label: "Leaves", path: "/admin/adminleaves", icon: <FiCalendar /> },
       { label: "Employee Status", path: "/admin/employeestatus", icon: <FiCalendar /> },
       { label: "Notice", path: "/admin/announcements", icon: <FiCalendar /> },
       { label: "Clients", path: "/admin/clients", icon: <FiCalendar /> },
@@ -31,22 +32,33 @@ const navItems = [
   { label: "Employees", path: "/admin/employees", icon: <FiUsers /> },
   {
   label: "Recruitment",
-  icon: <FiUsers />,
-  children: [
-    {
-      label: "Candidates",
-      path: "/admin/Recruitment/candidates",
-    },
-    {
-      label: "Interview Pipeline",
-      path: "/admin/Recruitment/interviews",
-    },
-    {
-      label: "Selected",
-      path: "/admin/Recruitment/selected",
-    },
-  ],
-},
+    icon: <FiUsers />,
+    children: [
+      {
+        label: "Candidates",
+        path: "/admin/Recruitment/candidates",
+      },
+      {
+        label: "Interview Pipeline",
+        path: "/admin/Recruitment/interviews",
+      },
+      {
+        label: "Selected",
+        path: "/admin/Recruitment/selected",
+      },
+    ],
+  },
+  { label: "TimeSheet", path: "/admin/timesheet", icon: <FiCalendar /> },
+  {
+    label: "Announcements",
+    path: "/admin/announcements-view",
+    icon: <FiStar />,
+  },
+  {
+    label: "Leave Management",
+    path: "/admin/leaves",
+    icon: <FiCalendar />,
+  },
 ];
 
 export default function Sidebar() {

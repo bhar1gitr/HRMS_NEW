@@ -9,8 +9,6 @@ export default function Login() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // We deleted the loginType state entirely!
-
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     if (error) setError("");
@@ -31,7 +29,6 @@ export default function Login() {
       const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // We only send the credentials now
         body: JSON.stringify({
           identifier: form.identifier,
           password: form.password,
@@ -47,12 +44,16 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
 
-      // Locate this block in your Login login handler inside Login.jsx:
-      if (data.user.role === "admin" || data.user.role === "hr") {
+      // Dynamic Router Allocation Matrix (Supporting Leader)
+      const normalizedRole = data.user.role ? data.user.role.toLowerCase() : "";
+
+      if (normalizedRole === "admin" || normalizedRole === "hr") {
         navigate("/admin/dashboard");
-      } else if (data.user.role === "manager") {
-        // FIXED: Redirects directly to the explicit manager workspace path prefix
+      } else if (normalizedRole === "manager") {
         navigate("/manager/timesheet");
+      } else if (normalizedRole === "leader") {
+        // FIXED: Route leaders to their view-only executive timeline workspace
+        navigate("/leader/timesheet");
       } else {
         navigate("/employee/dashboard");
       }
@@ -125,8 +126,6 @@ export default function Login() {
 
           {error && <div style={styles.error}>{error}</div>}
 
-          {/* I deleted the three role buttons here. It's just a clean Sign In button now! */}
-
           <button
             type="submit"
             style={{
@@ -152,9 +151,7 @@ export default function Login() {
   );
 }
 
-// Keep all your exact same styles down here!
 const styles = {
-  // ... (Your existing styles remain unchanged)
   container: { position: "fixed", inset: 0, width: "100vw", height: "100vh", background: "linear-gradient(135deg, #0d2d3d 0%, #1a6080 100%)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", fontFamily: "'Inter', system-ui, sans-serif" },
   backgroundIcons: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1, pointerEvents: "none" },
   icon: { position: "absolute", transition: "all 25s linear" },

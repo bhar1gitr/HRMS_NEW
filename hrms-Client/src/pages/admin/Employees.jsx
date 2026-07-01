@@ -89,7 +89,6 @@ const Employees = () => {
   };
 
   useEffect(() => {
-    // Determine user privilege level matching sidebar mechanics
     const savedRole = localStorage.getItem("role") || sessionStorage.getItem("role") || "";
     setUserRole(savedRole.toUpperCase());
 
@@ -99,9 +98,6 @@ const Employees = () => {
   }, []);
 
   const openModal = () => {
-    // Safety check: Prevent admin from initiating an add sequence
-    if (userRole === "ADMIN") return;
-
     setFormData(initialFormState);
     setSelectedFile(null); 
     setIsEditMode(false);
@@ -136,9 +132,6 @@ const Employees = () => {
   };
 
   const handleEdit = async (id) => {
-    // Hard lock on routing to write states if authenticated as Admin
-    if (userRole === "ADMIN") return;
-
     try {
       const response = await fetch(`http://localhost:5000/api/admin/employees/${id}`);
       if (!response.ok) throw new Error('Failed to fetch employee details');
@@ -160,8 +153,6 @@ const Employees = () => {
   };
 
   const handleDelete = async (id) => {
-    if (userRole === "ADMIN") return;
-
     if (window.confirm("Are you sure you want to delete this employee? They will be archived from the main view.")) {
       try {
         const response = await fetch(`http://localhost:5000/api/admin/employees/${id}`, {
@@ -223,8 +214,6 @@ const Employees = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isViewMode || userRole === "ADMIN") return; 
-
     setIsSubmitting(true);
     setFormError(null);
 
@@ -271,16 +260,13 @@ const Employees = () => {
   return (
     <div style={{ fontFamily: TYPOGRAPHY.fontFamily, position: 'relative' }}>
       
-      {/* HEADER */}
+      {/* HEADER WITH UNIVERSAL ACTION CALL */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ margin: 0, color: C.secondary }}>Employees</h2>
-        {/* Hide Add Button from Admin */}
-        {userRole !== "ADMIN" && (
-          <button onClick={openModal} style={styles.addBtn}>+ Add Employee</button>
-        )}
+        <button onClick={openModal} style={styles.addBtn}>+ Add Employee</button>
       </div>
       
-      {/* TABLE */}
+      {/* TABLE DATA SHEET BOARD */}
       <div style={styles.tableContainer}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead style={{ borderBottom: `2px solid ${C.borderLight}` }}>
@@ -329,14 +315,8 @@ const Employees = () => {
                 </td>
                 <td style={{ ...styles.td, textAlign: 'center' }}>
                   <button onClick={() => handleView(employee.EmployeeID)} style={styles.actionBtn.view}>View</button>
-                  
-                  {/* Hide Write Controls from Admin */}
-                  {userRole !== "ADMIN" && (
-                    <>
-                      <button onClick={() => handleEdit(employee.EmployeeID)} style={styles.actionBtn.edit}>Edit</button>
-                      <button onClick={() => handleDelete(employee.EmployeeID)} style={styles.actionBtn.archive}>Archive</button>
-                    </>
-                  )}
+                  <button onClick={() => handleEdit(employee.EmployeeID)} style={styles.actionBtn.edit}>Edit</button>
+                  <button onClick={() => handleDelete(employee.EmployeeID)} style={styles.actionBtn.archive}>Archive</button>
                 </td>
               </tr>
             ))}
@@ -350,14 +330,14 @@ const Employees = () => {
         )}
       </div>
 
-      {/* MODAL OVERLAY */}
+      {/* DETAILED CONTROL MODAL LAYOUT OVERLAY */}
       {isModalOpen && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: 0, color: C.secondary }}>
-                {(isViewMode || userRole === "ADMIN") ? 'Employee Details' : (isEditMode ? 'Edit Employee' : 'Add New Employee')}
+                {isViewMode ? 'Employee Details' : (isEditMode ? 'Edit Employee' : 'Add New Employee')}
               </h2>
               <button onClick={closeModal} style={styles.closeModalBtn}>&times;</button>
             </div>
@@ -379,8 +359,7 @@ const Employees = () => {
 
             <form onSubmit={handleSubmit}>
               <div style={styles.scrollableFormArea}>
-                {/* Dynamically disable the entire form if viewed or if user is an admin */}
-                <fieldset disabled={isViewMode || userRole === "ADMIN"} style={{ border: 'none', padding: 0, margin: 0 }}>
+                <fieldset disabled={isViewMode} style={{ border: 'none', padding: 0, margin: 0 }}>
                   
                   {/* TAB 1: Personal Details */}
                   {activeTab === 'Personal' && (
@@ -388,7 +367,7 @@ const Employees = () => {
                       
                       <div style={{ ...styles.formGroup, gridColumn: '1 / -1' }}>
                         <label style={styles.label}>Profile Photo</label>
-                        {(isViewMode || userRole === "ADMIN") && formData.Photo ? (
+                        {isViewMode && formData.Photo ? (
                           <img 
                             src={`http://localhost:5000/uploads/${formData.Photo}`} 
                             alt="Employee Profile" 
@@ -399,11 +378,10 @@ const Employees = () => {
                             type="file" 
                             accept="image/*" 
                             onChange={handleFileChange} 
-                            disabled={isViewMode || userRole === "ADMIN"}
                             style={{ ...styles.input, background: '#f8fafc', padding: '10px' }} 
                           />
                         )}
-                        {isEditMode && formData.Photo && !selectedFile && userRole !== "ADMIN" && (
+                        {isEditMode && formData.Photo && !selectedFile && (
                           <div style={{ marginTop: '8px', fontSize: '13px', color: C.muted }}>
                             Current Photo: {formData.Photo}
                           </div>
@@ -583,14 +561,13 @@ const Employees = () => {
                 </fieldset>
               </div>
 
-              {/* Form Actions */}
+              {/* Form Actions Footer */}
               <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '16px', paddingTop: '16px', borderTop: `1px solid ${C.borderLight}` }}>
                 <button type="button" onClick={closeModal} style={styles.cancelBtn}>
-                  {(isViewMode || userRole === "ADMIN") ? 'Close' : 'Cancel'}
+                  {isViewMode ? 'Close' : 'Cancel'}
                 </button>
                 
-                {/* Only render submit operational block if role is not Admin */}
-                {!isViewMode && userRole !== "ADMIN" && (
+                {!isViewMode && (
                   <button type="submit" disabled={isSubmitting} style={styles.submitBtn}>
                     {isSubmitting 
                       ? (isEditMode ? 'Updating...' : 'Saving...') 
@@ -606,7 +583,7 @@ const Employees = () => {
   );
 }
 
-// --- Styles ---
+// --- Styles Layout ---
 const styles = {
   tableContainer: { overflowX: 'auto', backgroundColor: C.card, borderRadius: RADIUS.card, boxShadow: SHADOW.card },
   th: { padding: '16px', color: C.muted, fontWeight: '600', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em' },
@@ -619,47 +596,17 @@ const styles = {
     edit: { backgroundColor: 'transparent', color: C.warning, border: `1px solid ${C.warning}`, padding: '6px 12px', borderRadius: RADIUS.button, cursor: 'pointer', marginRight: '8px', fontSize: '13px', fontWeight: '500' },
     archive: { backgroundColor: 'transparent', color: C.danger, border: `1px solid ${C.danger}`, padding: '6px 12px', borderRadius: RADIUS.button, cursor: 'pointer', fontSize: '13px', fontWeight: '500' }
   },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', 
-    display: 'flex', justifyContent: 'center', alignItems: 'center',
-    zIndex: 1000,
-    padding: '20px'
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: '32px',
-    borderRadius: '16px',
-    width: '100%',
-    maxWidth: '900px',
-    maxHeight: '90vh',
-    display: 'flex', flexDirection: 'column',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-  },
-  scrollableFormArea: {
-    overflowY: 'auto',
-    paddingRight: '10px',
-    maxHeight: '50vh', 
-  },
-  closeModalBtn: {
-    background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', color: '#64748b', lineHeight: '1'
-  },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' },
+  modalContent: { backgroundColor: '#fff', padding: '32px', borderRadius: '16px', width: '100%', maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' },
+  scrollableFormArea: { overflowY: 'auto', paddingRight: '10px', maxHeight: '50vh' },
+  closeModalBtn: { background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', color: '#64748b', lineHeight: '1' },
   tabContainer: { display: 'flex', borderBottom: '2px solid #e5edf4', marginBottom: '24px', overflowX: 'auto' },
   activeTab: { padding: '12px 24px', backgroundColor: 'transparent', border: 'none', borderBottom: '3px solid #3ea0cf', color: '#3ea0cf', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px' },
   inactiveTab: { padding: '12px 24px', backgroundColor: 'transparent', border: 'none', color: '#64748b', fontWeight: '600', cursor: 'pointer', fontSize: '15px' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' },
   formGroup: { display: 'flex', flexDirection: 'column' },
   label: { marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: '#334155' },
-  input: { 
-    padding: '12px', 
-    borderRadius: '8px', 
-    border: '1px solid #e5edf4', 
-    backgroundColor: '#f8fafc', 
-    color: '#0f172a', 
-    fontSize: '14px', 
-    outline: 'none',
-  },
+  input: { padding: '12px', borderRadius: '8px', border: '1px solid #e5edf4', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', outline: 'none' },
   submitBtn: { border: "none", background: "#d63a6e", color: "#fff", padding: "12px 24px", borderRadius: "10px", fontWeight: "600", cursor: "pointer" },
   cancelBtn: { backgroundColor: 'transparent', color: '#64748b', border: '1px solid #e5edf4', padding: '12px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }
 };

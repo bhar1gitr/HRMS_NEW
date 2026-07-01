@@ -7,7 +7,7 @@ const  { getAllEmployees, getAllDepartments, getAllLeaves, addLeaveType, getAllL
         addEmployeeStatus, updateEmployeeStatus, deleteEmployeeStatus, getAnnouncements, 
         addAnnouncement, updateAnnouncement, deleteAnnouncement, getAllSupervisors,
       getClients, addClient, updateClient, deleteClient, getAllProjects, getProjectById,
-     createProject, updateProject, deleteProject, getClientsLookup } = require('../controllers/adminController');
+     createProject, updateProject, deleteProject, getClientsLookup, getTeamTimesheets } = require('../controllers/adminController');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -51,5 +51,6 @@ router.post('/projects', createProject);
 router.put('/projects/:id', updateProject);
 router.delete('/projects/:id', deleteProject);
 router.get('/clients-lookup', getClientsLookup);
+router.get('/timesheets', getTeamTimesheets)
 
 module.exports = router;

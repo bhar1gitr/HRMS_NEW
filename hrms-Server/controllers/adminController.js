@@ -605,3 +605,65 @@ exports.deleteProject = async (req, res) => {
     res.status(500).json({ message: 'Database constraint restriction prevented dropping row.' });
   }
 };
+
+exports.getTeamTimesheets = async (req, res) => {
+    try {
+        const { supervisorId, role } = req.query; 
+
+        if (!supervisorId) {
+            return res.status(400).json({ message: "Missing supervisor authentication parameter context." });
+        }
+
+        // Check if the user has global oversight capabilities
+        const isGlobalAdmin = (role === 'admin' || role === 'hr' || role === 'leader');
+
+        let query = "";
+        let queryParams = [];
+
+        if (isGlobalAdmin) {
+            // GLOBAL OVERSIGHT: Fetch ALL timesheets across the company
+            query = `
+                SELECT 
+                    t.*, 
+                    e.FirstName, e.LastName,
+                    e.DirectSupervisor, e.IndirectSupervisor,
+                    d.Department as DepartmentName
+                FROM pms_timesheet t
+                LEFT JOIN employee e ON t.employeeid = e.EmployeeID
+                LEFT JOIN department d ON t.departmentid = d.id
+                ORDER BY t.timesheetdate DESC, t.employeeid ASC, t.timesheetid ASC
+            `;
+        } else {
+            // MANAGER OVERSIGHT: Fetch only employees assigned to this supervisor
+            const [supRows] = await db.query(
+                `SELECT CONCAT(FirstName, ' ', LastName) AS FullName FROM employee WHERE EmployeeID = ?`, 
+                [supervisorId]
+            );
+
+            const supervisorName = supRows.length > 0 ? supRows[0].FullName : '';
+
+            query = `
+                SELECT 
+                    t.*, 
+                    e.FirstName, e.LastName,
+                    e.DirectSupervisor, e.IndirectSupervisor,
+                    d.Department as DepartmentName
+                FROM pms_timesheet t
+                LEFT JOIN employee e ON t.employeeid = e.EmployeeID
+                LEFT JOIN department d ON t.departmentid = d.id
+                WHERE e.DirectSupervisor = ? 
+                   OR e.IndirectSupervisor = ?
+                   OR e.DirectSupervisor = ? 
+                   OR e.IndirectSupervisor = ?
+                ORDER BY t.timesheetdate DESC, t.employeeid ASC, t.timesheetid ASC
+            `;
+            queryParams = [supervisorName, supervisorName, supervisorId, supervisorId];
+        }
+
+        const [rows] = await db.query(query, queryParams);
+        res.status(200).json(rows);
+    } catch (error) {
+        console.error("Error fetching team timesheets:", error);
+        res.status(500).json({ message: "Failed to load timesheets.", error: error.message });
+    }
+};

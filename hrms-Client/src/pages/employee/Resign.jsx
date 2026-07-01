@@ -1,54 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { C, SHADOW, RADIUS } from "../../theme";
+import { apiUrl } from '../../URL';
 
 const PROCESS_STEPS = [
-  {
-    key: "submitted",
-    title: "Resignation submitted",
-    desc: "Your request has been received",
-  },
-  {
-    key: "manager_review",
-    title: "Manager review",
-    desc: "Reviewed by your reporting manager",
-  },
-  {
-    key: "manager_lwd",
-    title: "Manager recommended LWD",
-    desc: "Manager proposes a last working date",
-  },
-  {
-    key: "hr_review",
-    title: "HR review",
-    desc: "HR verifies notice period & documents",
-  },
-  {
-    key: "decision",
-    title: "Accepted / negotiation",
-    desc: "Resignation accepted or discussed",
-  },
-  {
-    key: "hr_lwd",
-    title: "HR confirmed LWD",
-    desc: "Final last working date is confirmed",
-  },
-  {
-    key: "exit_interview",
-    title: "Exit interview",
-    desc: "Formal feedback session",
-  },
-  {
-    key: "asset",
-    title: "Asset clearance",
-    desc: "Return company assets & NOC",
-  },
-  {
-    key: "settlement",
-    title: "Final settlement",
-    desc: "Full & final processed",
-  },
-  { key: "closed", title: "Closed", desc: "Separation process complete" },
+  { key: "Submitted", title: "Resignation submitted", desc: "Your request has been received" },
+  { key: "Manager Review", title: "Manager review", desc: "Reviewed by your reporting manager" },
+  { key: "Manager LWD Propose", title: "Manager recommended LWD", desc: "Manager proposes a last working date" },
+  { key: "HR Review", title: "HR review", desc: "HR verifies notice period & documents" },
+  { key: "Negotiation", title: "Accepted / negotiation", desc: "Resignation accepted or discussed" },
+  { key: "HR LWD Confirmed", title: "HR confirmed LWD", desc: "Final last working date is confirmed" },
+  { key: "Exit Interview", title: "Exit interview", desc: "Formal feedback session" },
+  { key: "Asset Clearance", title: "Asset clearance", desc: "Return company assets & NOC" },
+  { key: "Settlement", title: "Final settlement", desc: "Full & final processed" },
+  { key: "Closed", title: "Closed", desc: "Separation process complete" },
 ];
 
 export default function EmployeeResign() {
@@ -59,6 +24,7 @@ export default function EmployeeResign() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [status, setStatus] = useState("Pending");
   const [acknowledged, setAcknowledged] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
   const [form, setForm] = useState({
     resignationDate: "",
@@ -68,6 +34,50 @@ export default function EmployeeResign() {
   });
 
   const noticePeriodDays = 90;
+
+  // --- 1. SYNC STATE FROM DATABASE ON MOUNT ---
+  useEffect(() => {
+    const fetchActiveResignationState = async () => {
+      try {
+        // 1. Pull the user session data from localStorage
+        const storedUser = JSON.parse(localStorage.getItem("user"));
+        // Safely catch either lower 'id' or matching 'EmployeeID' property fields
+        const empId = storedUser?.id || storedUser?.EmployeeID || "";
+
+        if (!empId) {
+          console.warn("Skipping load: No active user session ID found in storage.");
+          setPageLoading(false);
+          return;
+        }
+
+        // 2. FIXED: Explicitly pass the parameter inside the URL string path!
+        const res = await fetch(`${apiUrl}/api/employee/active-resignation?employeeId=${empId}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        const data = await res.json();
+
+        if (data.success && data.hasActiveResignation) {
+          const record = data.data;
+          setResignationSubmitted(true);
+          setShowConfirmModal(false);
+          setStatus(record.Status);
+
+          const targetIndex = PROCESS_STEPS.findIndex(step => step.key.toLowerCase() === record.Status.toLowerCase());
+          setCurrentStepIndex(targetIndex !== -1 ? targetIndex : 0);
+        }
+      } catch (err) {
+        console.error("Failed to sync structural exit log tracking tracks:", err);
+      } finally {
+        setPageLoading(false);
+      }
+    };
+
+    fetchActiveResignationState();
+  }, []);
 
   const calculateLWD = () => {
     if (!form.resignationDate) return "";
@@ -80,6 +90,7 @@ export default function EmployeeResign() {
     });
   };
 
+  // --- 2. MULTIPART FORM SUBMISSION WITH PAYLOAD IDENTIFIER ---
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -88,7 +99,6 @@ export default function EmployeeResign() {
     }
 
     const formData = new FormData();
-
     formData.append("resignationDate", form.resignationDate);
     formData.append("primaryReason", form.primaryReason);
     formData.append("additionalComments", form.additionalComments);
@@ -97,8 +107,20 @@ export default function EmployeeResign() {
       formData.append("attachment", form.attachment);
     }
 
+    // FIXED: Manually bundle active employee context details into payload to prevent backend req.user parsing crashes
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+    if (storedUser && storedUser.id) {
+      formData.append("employeeId", storedUser.id);
+    } else {
+      return alert("Session expired. Please log in again to authentic context parameters.");
+    }
+
+    // Dynamic logging verification block
+    console.log("=== VERIFYING RESIGNATION FORM PAYLOAD ===");
+    console.log("Text fields compiled:", Object.fromEntries(formData));
+
     try {
-      const res = await fetch(`${apiUrl}/employee/submit-resignation`, {
+      const res = await fetch(`${apiUrl}/api/employee/submit-resignation`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -115,7 +137,7 @@ export default function EmployeeResign() {
       alert("Resignation submitted successfully");
 
       setResignationSubmitted(true);
-      setCurrentStepIndex(1);
+      setCurrentStepIndex(0); // Set to first step ('Submitted')
       setStatus("Submitted");
     } catch (err) {
       console.error(err);
@@ -124,26 +146,28 @@ export default function EmployeeResign() {
   };
 
   const handleWithdraw = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to withdraw your resignation? HR will need to approve this withdrawal.",
-      )
-    ) {
+    if (window.confirm("Are you sure you want to withdraw your resignation? HR will need to approve this withdrawal.")) {
       setStatus("Withdrawal Requested");
     }
   };
+
+  if (pageLoading) {
+    return (
+      <div style={{ padding: "100px 40px", color: C.muted, textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
+        <strong>Synchronizing departure workflow data streams...</strong>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
       {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.title}>Resignation</h1>
-        <p style={styles.subtitle}>
-          Submit your resignation request and track its status
-        </p>
+        <p style={styles.subtitle}>Submit your resignation request and track its status</p>
       </div>
 
-      {/* Form */}
+      {/* Form View (Visible if no request logged yet) */}
       {!resignationSubmitted && (
         <div style={styles.card}>
           <h2 style={styles.sectionTitle}>Submit resignation</h2>
@@ -156,9 +180,7 @@ export default function EmployeeResign() {
                   type="date"
                   style={styles.input}
                   value={form.resignationDate}
-                  onChange={(e) =>
-                    setForm({ ...form, resignationDate: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, resignationDate: e.target.value })}
                   required
                 />
               </div>
@@ -168,9 +190,7 @@ export default function EmployeeResign() {
                 <select
                   style={styles.input}
                   value={form.primaryReason}
-                  onChange={(e) =>
-                    setForm({ ...form, primaryReason: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, primaryReason: e.target.value })}
                   required
                 >
                   <option value="">Select reason</option>
@@ -195,46 +215,30 @@ export default function EmployeeResign() {
                 style={styles.textarea}
                 placeholder="Please provide additional details…"
                 value={form.additionalComments}
-                onChange={(e) =>
-                  setForm({ ...form, additionalComments: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, additionalComments: e.target.value })}
               />
             </div>
 
             <div style={{ marginTop: "24px" }}>
-              <label style={styles.label}>
-                Supporting attachment (optional)
-              </label>
+              <label style={styles.label}>Supporting attachment (optional)</label>
               <input
                 type="file"
                 style={styles.input}
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                onChange={(e) =>
-                  setForm({ ...form, attachment: e.target.files[0] || null })
-                }
+                onChange={(e) => setForm({ ...form, attachment: e.target.files[0] || null })}
               />
               {form.attachment && (
                 <div style={styles.filePreview}>
                   <span style={{ fontSize: "16px" }}>📎</span>
                   <span style={{ flex: 1 }}>{form.attachment.name}</span>
-                  <span
-                    style={styles.fileRemove}
-                    onClick={() => setForm({ ...form, attachment: null })}
-                  >
-                    Remove
-                  </span>
+                  <span style={styles.fileRemove} onClick={() => setForm({ ...form, attachment: null })}>Remove</span>
                 </div>
               )}
             </div>
 
             <div style={styles.noticeBox}>
-              <div>
-                <strong>System notice period:</strong> {noticePeriodDays} days
-              </div>
-              <div style={{ marginTop: "4px" }}>
-                <strong>Expected last working date:</strong>{" "}
-                {calculateLWD() || "—"}
-              </div>
+              <div><strong>System notice period:</strong> {noticePeriodDays} days</div>
+              <div style={{ marginTop: "4px" }}><strong>Expected last working date:</strong> {calculateLWD() || "—"}</div>
             </div>
 
             <label style={styles.ackRow}>
@@ -242,18 +246,10 @@ export default function EmployeeResign() {
                 type="checkbox"
                 checked={acknowledged}
                 onChange={(e) => setAcknowledged(e.target.checked)}
-                style={{
-                  width: "18px",
-                  height: "18px",
-                  marginTop: "2px",
-                  flexShrink: 0,
-                }}
+                style={{ width: "18px", height: "18px", marginTop: "2px", flexShrink: 0 }}
               />
-              <span
-                style={{ fontSize: "14px", color: C.text, lineHeight: "1.5" }}
-              >
-                I understand that submitting this resignation will initiate the
-                formal exit process.
+              <span style={{ fontSize: "14px", color: C.text, lineHeight: "1.5" }}>
+                I understand that submitting this resignation will initiate the formal exit process.
               </span>
             </label>
 
@@ -272,35 +268,21 @@ export default function EmployeeResign() {
         </div>
       )}
 
-      {/* Confirmation modal */}
+      {/* Confirmation Modal overlay block */}
       {showConfirmModal && !resignationSubmitted && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
-            <h2 style={styles.confirmTitle}>
-              Are you sure you want to resign?
-            </h2>
-            <p style={styles.confirmText}>
-              This action will start the formal separation process.
-            </p>
+            <h2 style={styles.confirmTitle}>Are you sure you want to resign?</h2>
+            <p style={styles.confirmText}>This action will start the formal separation process.</p>
             <div style={styles.confirmButtons}>
-              <button
-                style={styles.cancelBtn}
-                onClick={() => navigate("/employee/dashboard")}
-              >
-                No, go back
-              </button>
-              <button
-                style={styles.continueBtn}
-                onClick={() => setShowConfirmModal(false)}
-              >
-                Yes, continue
-              </button>
+              <button style={styles.cancelBtn} onClick={() => navigate("/employee/dashboard")}>No, go back</button>
+              <button style={styles.continueBtn} onClick={() => setShowConfirmModal(false)}>Yes, continue</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* After submission: process + withdrawal only */}
+      {/* Post Submission Tracking Steps Block */}
       {resignationSubmitted && (
         <>
           <div style={styles.card}>
@@ -314,11 +296,7 @@ export default function EmployeeResign() {
                     <div
                       style={{
                         ...styles.iconCircle,
-                        background: isDone
-                          ? "#16a34a"
-                          : isCurrent
-                            ? C.primary
-                            : "#e8f4fa",
+                        background: isDone ? "#16a34a" : isCurrent ? C.primary : "#e8f4fa",
                         color: isDone || isCurrent ? "#fff" : C.primary,
                       }}
                     >
@@ -328,9 +306,7 @@ export default function EmployeeResign() {
                       <div style={styles.stepTitle}>{step.title}</div>
                       <div style={styles.stepDesc}>{step.desc}</div>
                     </div>
-                    {isCurrent && (
-                      <span style={styles.currentTag}>In progress</span>
-                    )}
+                    {isCurrent && <span style={styles.currentTag}>In progress</span>}
                   </div>
                 );
               })}
@@ -340,27 +316,15 @@ export default function EmployeeResign() {
           {status !== "Withdrawal Requested" && (
             <div style={styles.card}>
               <h2 style={styles.sectionTitle}>Withdraw resignation</h2>
-              <p style={styles.withdrawText}>
-                If you have discussed with your manager or HR and wish to
-                continue your employment, you may submit a withdrawal request.
-              </p>
-              <button style={styles.withdrawBtn} onClick={handleWithdraw}>
-                Withdraw resignation
-              </button>
+              <p style={styles.withdrawText}>If you have discussed with your manager or HR and wish to continue your employment, you may submit a withdrawal request.</p>
+              <button style={styles.withdrawBtn} onClick={handleWithdraw}>Withdraw resignation</button>
             </div>
           )}
 
           {status === "Withdrawal Requested" && (
-            <div
-              style={{
-                ...styles.card,
-                background: "#fff7ed",
-                border: "1px solid #fed7aa",
-              }}
-            >
+            <div style={{ ...styles.card, background: "#fff7ed", border: "1px solid #fed7aa" }}>
               <p style={{ margin: 0, color: "#9a3412", fontSize: "14.5px" }}>
-                Your withdrawal request has been submitted and is pending HR
-                approval. You'll be notified once it's reviewed.
+                Your withdrawal request has been submitted and is pending HR approval. You'll be notified once it's reviewed.
               </p>
             </div>
           )}
@@ -370,210 +334,36 @@ export default function EmployeeResign() {
   );
 }
 
-/* ==================== STYLES ==================== */
 const styles = {
-  page: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "24px",
-    position: "relative",
-  },
+  page: { display: "flex", flexDirection: "column", gap: "24px", position: "relative" },
   header: { marginBottom: "8px" },
   title: { margin: 0, fontSize: "32px", fontWeight: "700", color: C.text },
   subtitle: { color: C.muted, marginTop: "6px", fontSize: "15.5px" },
-
-  modalOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(15,23,42,0.55)",
-    zIndex: 1000,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "20px",
-  },
-  modal: {
-    background: C.card,
-    borderRadius: RADIUS.card,
-    padding: "40px",
-    textAlign: "center",
-    boxShadow: SHADOW.card,
-    maxWidth: "480px",
-    width: "100%",
-  },
-  confirmTitle: {
-    fontSize: "24px",
-    fontWeight: "700",
-    marginBottom: "12px",
-    color: C.text,
-  },
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" },
+  modal: { background: C.card, borderRadius: RADIUS.card, padding: "40px", textAlign: "center", boxShadow: SHADOW.card, maxWidth: "480px", width: "100%" },
+  confirmTitle: { fontSize: "24px", fontWeight: "700", marginBottom: "12px", color: C.text },
   confirmText: { color: C.muted, marginBottom: "28px" },
   confirmButtons: { display: "flex", justifyContent: "center", gap: "14px" },
-  continueBtn: {
-    background: "#16a34a",
-    color: "#fff",
-    border: "none",
-    padding: "13px 26px",
-    borderRadius: RADIUS.button,
-    cursor: "pointer",
-    fontWeight: "600",
-  },
-  cancelBtn: {
-    background: "#f1f5f9",
-    color: C.text,
-    border: `1px solid ${C.border}`,
-    padding: "13px 26px",
-    borderRadius: RADIUS.button,
-    cursor: "pointer",
-    fontWeight: "600",
-  },
-
-  card: {
-    background: C.card,
-    borderRadius: RADIUS.card,
-    padding: "32px",
-    boxShadow: SHADOW.card,
-  },
-
-  sectionTitle: {
-    margin: "0 0 26px 0",
-    fontSize: "20px",
-    fontWeight: "700",
-    color: C.primary,
-    borderBottom: `2px solid ${C.border}`,
-    paddingBottom: "12px",
-  },
-
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-    gap: "20px",
-  },
-  label: {
-    display: "block",
-    marginBottom: "8px",
-    fontSize: "14px",
-    fontWeight: "600",
-    color: C.text,
-  },
-  input: {
-    width: "100%",
-    padding: "13px 16px",
-    borderRadius: RADIUS.button,
-    border: `1px solid ${C.border}`,
-    backgroundColor: "#f8fafc",
-    fontSize: "15px",
-    outline: "none",
-  },
-  textarea: {
-    width: "100%",
-    padding: "13px 16px",
-    borderRadius: RADIUS.button,
-    border: `1px solid ${C.border}`,
-    backgroundColor: "#f8fafc",
-    fontSize: "15px",
-    resize: "vertical",
-    minHeight: "130px",
-    outline: "none",
-  },
-
-  filePreview: {
-    marginTop: "10px",
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "10px 14px",
-    background: "#f8fafc",
-    border: `1px solid ${C.border}`,
-    borderRadius: RADIUS.button,
-    fontSize: "13.5px",
-    color: C.text,
-  },
-  fileRemove: {
-    color: "#dc2626",
-    cursor: "pointer",
-    fontSize: "12.5px",
-    fontWeight: "600",
-    flexShrink: 0,
-  },
-
-  noticeBox: {
-    margin: "24px 0",
-    padding: "18px 20px",
-    background: "#eff6ff",
-    border: "1px solid #bfdbfe",
-    borderRadius: RADIUS.button,
-    color: "#1e40af",
-    fontSize: "14.5px",
-  },
-
-  ackRow: {
-    display: "flex",
-    gap: "10px",
-    alignItems: "flex-start",
-    margin: "20px 0",
-    cursor: "pointer",
-  },
-
-  submitBtn: {
-    marginTop: "12px",
-    border: "none",
-    background: C.accent,
-    color: "#fff",
-    padding: "15px 32px",
-    borderRadius: RADIUS.button,
-    fontWeight: "600",
-    fontSize: "16px",
-    boxShadow: "0 10px 25px rgba(214,58,110,0.25)",
-    transition: "all 0.2s",
-  },
-
+  continueBtn: { background: "#16a34a", color: "#fff", border: "none", padding: "13px 26px", borderRadius: RADIUS.button, cursor: "pointer", fontWeight: "600" },
+  cancelBtn: { background: "#f1f5f9", color: C.text, border: `1px solid ${C.border}`, padding: "13px 26px", borderRadius: RADIUS.button, cursor: "pointer", fontWeight: "600" },
+  card: { background: C.card, borderRadius: RADIUS.card, padding: "32px", boxShadow: SHADOW.card },
+  sectionTitle: { margin: "0 0 26px 0", fontSize: "20px", fontWeight: "700", color: C.primary, borderBottom: `2px solid ${C.border}`, paddingBottom: "12px" },
+  formGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "20px" },
+  label: { display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: "600", color: C.text },
+  input: { width: "100%", padding: "13px 16px", borderRadius: RADIUS.button, border: `1px solid ${C.border}`, backgroundColor: "#f8fafc", fontSize: "15px", outline: "none" },
+  textarea: { width: "100%", padding: "13px 16px", borderRadius: RADIUS.button, border: `1px solid ${C.border}`, backgroundColor: "#f8fafc", fontSize: "15px", resize: "vertical", minHeight: "130px", outline: "none" },
+  filePreview: { marginTop: "10px", display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", background: "#f8fafc", border: `1px solid ${C.border}`, borderRadius: RADIUS.button, fontSize: "13.5px", color: C.text },
+  fileRemove: { color: "#dc2626", cursor: "pointer", fontSize: "12.5px", fontWeight: "600", flexShrink: 0 },
+  noticeBox: { margin: "24px 0", padding: "18px 20px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: RADIUS.button, color: "#1e40af", fontSize: "14.5px" },
+  ackRow: { display: "flex", gap: "10px", alignItems: "flex-start", margin: "20px 0", cursor: "pointer" },
+  submitBtn: { marginTop: "12px", border: "none", background: C.accent, color: "#fff", padding: "15px 32px", borderRadius: RADIUS.button, fontWeight: "600", fontSize: "16px", boxShadow: "0 10px 25px rgba(214,58,110,0.25)", transition: "all 0.2s" },
   timeline: { display: "flex", flexDirection: "column", gap: "20px" },
-  step: {
-    display: "flex",
-    gap: "18px",
-    alignItems: "flex-start",
-    position: "relative",
-  },
-  iconCircle: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "16px",
-    fontWeight: "700",
-    flexShrink: 0,
-    transition: "all 0.2s",
-  },
+  step: { display: "flex", gap: "18px", alignItems: "flex-start", position: "relative" },
+  iconCircle: { width: "44px", height: "44px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "700", flexShrink: 0, transition: "all 0.2s" },
   stepContent: { paddingTop: "6px", flex: 1 },
-  stepTitle: {
-    fontWeight: "600",
-    color: C.text,
-    fontSize: "15px",
-    marginBottom: "3px",
-  },
+  stepTitle: { fontWeight: "600", color: C.text, fontSize: "15px", marginBottom: "3px" },
   stepDesc: { color: C.muted, fontSize: "13.5px", lineHeight: "1.5" },
-  currentTag: {
-    alignSelf: "center",
-    fontSize: "11.5px",
-    fontWeight: "600",
-    color: C.primary,
-    background: "#e8f4fa",
-    padding: "4px 10px",
-    borderRadius: "999px",
-    whiteSpace: "nowrap",
-  },
-
+  currentTag: { alignSelf: "center", fontSize: "11.5px", fontWeight: "600", color: C.primary, background: "#e8f4fa", padding: "4px 10px", borderRadius: "999px", whiteSpace: "nowrap" },
   withdrawText: { color: C.muted, marginBottom: "20px" },
-  withdrawBtn: {
-    background: "#dc2626",
-    color: "#fff",
-    border: "none",
-    padding: "14px 24px",
-    borderRadius: RADIUS.button,
-    cursor: "pointer",
-    fontWeight: "600",
-  },
+  withdrawBtn: { background: "#dc2626", color: "#fff", border: "none", padding: "14px 24px", borderRadius: RADIUS.button, cursor: "pointer", fontWeight: "600" }
 };
